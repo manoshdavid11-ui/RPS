@@ -36,7 +36,7 @@ assets/images/favicon.svg
 
 ## The "Every drop, distilled in-house" background
 
-This section shows a live amber-spirit animation: slowly swirling liquid, rippling light and rising beads. Visitors get a "Pause animation" button.
+This section shows a live 3D product shot: an IGL Spirits bottle of amber spirit turning slowly on a glossy studio floor, with drifting smoke and studio lights. Visitors get a "Pause animation" button.
 
 To use your own clip instead, save it as `assets/video/showreel.mp4` (MP4, H.264, 1920x1080, 10 to 20 seconds, under 15 MB). It replaces the animation automatically and adds a sound button. Use footage of the product, the plants or the process only, never people drinking.
 

@@ -934,36 +934,69 @@ $$('.film-vid').forEach(v => {
   // ---- WebGL spirits shader ----
   const cv = document.createElement('canvas'); cv.className = 'spirit-cv'; box.appendChild(cv);
   const g = cv.getContext('webgl', {antialias:false, alpha:false});
-  const FS = `precision highp float;uniform vec2 uR;uniform float uT;uniform vec2 uM;varying vec2 vUv;
+  const FS = `precision highp float;uniform vec2 uR;uniform float uT;uniform vec2 uM;uniform float uX;uniform float uD;varying vec2 vUv;
+mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
+float smin(float a,float b,float k){float h=clamp(.5+.5*(b-a)/k,0.,1.);return mix(b,a,h)-k*h*(1.-h);}
 float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+1.),f.x),f.y);}
 float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}
-float caus(vec2 p,float t){vec2 q=p;float c=1.;float inten=.005;for(int n=0;n<5;n++){float tt=t*(1.-(3.5/float(n+1)));q=p+vec2(cos(tt-q.x)+sin(tt+q.y),sin(tt-q.y)+cos(tt+q.x));c+=1./length(vec2(p.x/(sin(q.x+tt)/inten),p.y/(cos(q.y+tt)/inten)));}c/=5.;c=1.17-pow(c,1.4);return clamp(pow(clamp(c,0.,1.),8.),0.,1.);}
-void main(){
- vec2 fc=vUv*uR;vec2 uv=fc/uR.y;vec2 p=(fc-.5*uR)/uR.y;float t=uT;
- vec2 w=vec2(fbm(uv*1.6+vec2(0.,-t*.05)),fbm(uv*1.6+vec2(5.2,1.3)-t*.04));
- float f=fbm(uv*2.2+w*1.6+vec2(t*.02,-t*.06));
- vec3 deep=vec3(.16,.06,.015),mid=vec3(.62,.30,.06),hi=vec3(.98,.70,.30);
- vec2 L=vec2(.55+uM.x*.15,.42+uM.y*.1);
- float light=smoothstep(1.25,.0,length(p-L*vec2(1.,1.)+vec2(.2,.0)));
- vec3 col=mix(deep,mid,smoothstep(.15,.85,f));col=mix(col,hi,pow(light,1.6)*smoothstep(.3,.9,f+light*.3));
- float c=caus(p*4.+w*.6,t*.35);col+=vec3(1.,.78,.42)*c*(.18+.5*light);
- float s=smoothstep(.06,0.,abs(p.x+.62+.04*sin(p.y*3.+t*.3)))*(.35+.3*sin(p.y*2.+t*.2));col+=vec3(1.,.9,.7)*s*.35;
- for(int i=0;i<3;i++){float fi=float(i);vec2 gp=uv*vec2(14.+fi*6.,7.+fi*3.)+vec2(fi*3.1,t*(.35+fi*.2));vec2 id=floor(gp);vec2 gf=fract(gp)-.5;float r=h21(id+fi*7.);
-  if(r>.82){vec2 o=vec2(h21(id+3.)-.5,h21(id+9.)-.5)*.5;float d=length(gf-o);float rad=.06+.08*h21(id+5.);
-   float ring=smoothstep(rad,rad*.6,d)-smoothstep(rad*.75,rad*.3,d)*.6;col+=vec3(1.,.86,.6)*ring*(.25+.25*light);
-   col+=vec3(1.)*smoothstep(rad*.35,0.,length(gf-o-vec2(-rad*.3,rad*.3)))*.35;}}
- for(int i=0;i<6;i++){float fi=float(i);vec2 bc=vec2(fract(.17*fi+.05*sin(t*.07+fi))*1.9-.95,fract(.31*fi+t*.012*(1.+fi*.2))*1.2-.6);float d=length(p-bc*vec2(uR.x/uR.y*.55,1.));float br=.08+.05*fract(fi*.37);
-  col+=vec3(1.,.8,.5)*smoothstep(br,br*.75,d)*.07;}
- col*=1.-.55*dot(vUv-.5,vUv-.5)*2.;
- col+=(h21(fc+fract(t)*61.)-.5)*.02;
- gl_FragColor=vec4(pow(clamp(col,0.,1.),vec3(.95)),1.);}`;
-  let prog = null, U = {}, scale = .6, W = 2, H = 2;
+float sdRC(vec3 p,float r1,float r2,float h){vec2 q=vec2(length(p.xz),p.y);float b=(r1-r2)/h;float a=sqrt(1.-b*b);float k=dot(q,vec2(-b,a));if(k<0.)return length(q)-r1;if(k>a*h)return length(q-vec2(0.,h))-r2;return dot(q,vec2(a,b))-r1;}
+float sdCyl(vec3 p,float R,float H,float rb){vec2 d=vec2(length(p.xz)-(R-rb),abs(p.y)-(H-rb));return min(max(d.x,d.y),0.)+length(max(d,0.))-rb;}
+float yaw;
+vec3 loc(vec3 p){p.x-=uX;p.xz*=rot(yaw);return p;}
+float gS(vec3 q){float body=sdCyl(q-vec3(0.,.85,0.),.56,.85,.08);float sh=sdRC(q-vec3(0.,1.5,0.),.5,.13,.62);float neck=sdCyl(q-vec3(0.,2.33,0.),.135,.3,.03);return smin(smin(body,sh,.1),neck,.06);}
+float cS(vec3 q){return sdCyl(q-vec3(0.,2.64,0.),.168,.17,.03);}
+float map(vec3 p){vec3 q=loc(p);return min(gS(q),cS(q));}
+vec3 nor(vec3 p){vec2 e=vec2(.0012,0.);return normalize(vec3(map(p+e.xyy)-map(p-e.xyy),map(p+e.yxy)-map(p-e.yxy),map(p+e.yyx)-map(p-e.yyx)));}
+vec3 studio(vec3 d){vec3 c=mix(vec3(.05,.025,.012),vec3(.18,.09,.035),smoothstep(-.3,.6,d.y));float a=atan(d.x,d.z);
+ float vy=smoothstep(-.25,.0,d.y)*smoothstep(.85,.55,d.y);
+ c+=vec3(1.,.9,.78)*smoothstep(.09,.0,abs(a-2.2))*vy*3.2;c+=vec3(1.,.82,.6)*smoothstep(.07,.0,abs(a+2.35))*vy*2.2;
+ c+=vec3(.95,.7,.45)*smoothstep(.8,.97,d.y)*1.2;return c;}
+vec3 back(vec2 p){vec3 c=mix(vec3(.06,.03,.012),vec3(.30,.14,.05),smoothstep(-.7,.9,p.y*.8+p.x*.25));
+ vec2 sp=vec2(uX*.42,.12);c+=vec3(.95,.52,.18)*.42*exp(-dot(p-sp,p-sp)*2.2);
+ float s=fbm(p*1.4+vec2(0.,-uT*.07)+fbm(p*2.3+vec2(uT*.03,0.))*1.2);c+=vec3(.55,.3,.11)*pow(s,3.2)*.9;
+ for(int i=0;i<7;i++){float fi=float(i);vec2 bc=vec2(fract(.23*fi+.03*sin(uT*.1+fi))*2.2-1.1,fract(.37*fi+uT*.01*(1.+fi*.15))*1.3-.45);float r=.05+.06*fract(fi*.61);float d=length(p-bc*vec2(uR.x/uR.y*.5,1.));c+=vec3(1.,.72,.4)*smoothstep(r,r*.7,d)*.08;}
+ return c;}
+float sdDrop(vec2 p){p.y+=.1;float d=length(p)-.32;float tip=max(abs(p.x)*1.25+p.y*.62-.42,-p.y);return min(d,max(tip,-p.y-.0));}
+vec3 shade(vec3 p,vec3 rd){vec3 q=loc(p);vec3 n=nor(p);float ndv=max(dot(n,-rd),0.);float fr=.04+.96*pow(1.-ndv,5.);vec3 rf=studio(reflect(rd,n));vec3 L=normalize(vec3(-.4,.7,.6));
+ if(cS(q)<gS(q)){vec3 b=vec3(.07,.045,.03);b=mix(b,vec3(.85,.6,.25),smoothstep(.012,0.,abs(q.y-2.52)-.025));return b*(.25+.75*max(dot(n,L),0.))+rf*(.2+fr*.6);}
+ float lev=1.58+.012*sin(uT*1.3+q.x*4.);float ang=atan(q.x,q.z);
+ if(abs(ang)<1.25&&abs(q.y-.86)<.36&&length(q.xz)>.47){vec2 l=vec2(ang/1.25,(q.y-.86)/.36);vec3 pc=vec3(.95,.91,.83);vec3 gold=vec3(.72,.5,.18);
+  float fr1=step(.9,abs(l.x))+step(.88,abs(l.y));pc=mix(pc,gold,clamp(fr1,0.,1.)*.85);
+  float fr2=smoothstep(.012,.0,abs(abs(l.x)-.82))*step(abs(l.y),.8)+smoothstep(.012,.0,abs(abs(l.y)-.8))*step(abs(l.x),.82);pc=mix(pc,gold,clamp(fr2,0.,1.));
+  vec2 ep=(l-vec2(0.,.33))*vec2(1.9,1.);float dd=length(ep)-.24;if(dd<0.)pc=l.x<0.?vec3(.89,.63,.21):vec3(.36,.70,.84);if(abs(dd)<.018)pc=gold;
+  if(abs(l.x)<.014&&dd<0.)pc=vec3(.17,.11,.07);
+  float bar1=step(abs(l.y+.16),.06)*step(abs(l.x),.36);float bar2=step(abs(l.y+.38),.022)*step(abs(l.x),.5);float bar3=step(abs(l.y+.54),.016)*step(abs(l.x),.28);
+  pc=mix(pc,vec3(.17,.11,.07),max(bar1,max(bar2*.8,bar3*.6)));
+  return pc*(.22+.9*max(dot(n,L),0.))*(.75+.25*ndv)+rf*fr*.25;}
+ vec3 rr=refract(rd,n,.67);
+ if(q.y<lev){vec3 al=vec3(1.,.6,.2),ad=vec3(.32,.12,.02);float th=1.-ndv;vec3 b=mix(al*1.15,ad,.2+.75*pow(th,1.4));
+  b*=.55+.9*studio(rr).r;b+=al*pow(max(dot(rr,normalize(vec3(.1,.25,-1.))),0.),5.)*.9;
+  b+=vec3(1.,.82,.55)*smoothstep(.025,0.,abs(q.y-lev))*.7;
+  vec2 bg=vec2(ang*22.,q.y*26.-uT*1.4);vec2 bi=floor(bg);float bub=step(.93,h21(bi))*smoothstep(.22,.08,length(fract(bg)-.5));b+=vec3(1.,.88,.65)*bub*.35*(1.-th);
+  return mix(b,rf,fr*.9)+rf*.06;}
+ vec3 th2=studio(rr)*.45+vec3(.08,.04,.015);return mix(th2,rf,.12+fr);}
+void main(){vec2 fc=vUv*uR;vec2 p=(fc-.5*uR)/uR.y;yaw=uT*.22+uM.x*.7;
+ vec3 ro=vec3(uM.x*.25,1.5+uM.y*.2,uD),ta=vec3(0.,1.3,0.);vec3 f=normalize(ta-ro),r=normalize(cross(f,vec3(0.,1.,0.))),u=cross(r,f);
+ vec3 rd=normalize(p.x*r+p.y*u+2.1*f);vec3 col=back(p);
+ float t=0.;bool hit=false;for(int i=0;i<100;i++){float d=map(ro+rd*t);if(d<.0008*t){hit=true;break;}t+=d;if(t>20.)break;}
+ float tf=-ro.y/rd.y;
+ if(tf>0.&&(!hit||tf<t)){vec3 fp=ro+rd*tf;vec3 fl=back(p)*.42+vec3(.015,.008,.004);
+  vec3 r2=reflect(rd,vec3(0.,1.,0.));float t2=.02;bool h2=false;for(int i=0;i<70;i++){float d=map(fp+r2*t2);if(d<.002){h2=true;break;}t2+=d;if(t2>7.)break;}
+  if(h2)fl=mix(fl,shade(fp+r2*t2,r2),.32*exp(-t2*.5));
+  fl+=studio(r2)*.05;
+  float rb=length(fp.xz-vec2(uX,0.));fl*=.5+.5*smoothstep(.5,1.2,rb);
+  vec2 cc=fp.xz-vec2(uX+.12,.85);fl+=vec3(1.,.55,.18)*exp(-dot(cc*vec2(1.7,1.),cc*vec2(1.7,1.))*2.6)*.38*(.8+.2*sin(uT*2.+fp.x*20.));
+  col=mix(fl,back(p),smoothstep(uD-1.5,uD+5.,tf));}
+ else if(hit)col=shade(ro+rd*t,rd);
+ col*=1.-.5*dot(vUv-.5,vUv-.5)*2.;col+=(h21(fc+fract(uT)*61.)-.5)*.018;
+ gl_FragColor=vec4(pow(clamp(col,0.,1.),vec3(.92)),1.);}`;
+  let prog = null, U = {}, scale = .7, W = 2, H = 2;
   if (g) { const mk = (ty, src) => { const s = g.createShader(ty); g.shaderSource(s, src); g.compileShader(s); return g.getShaderParameter(s, g.COMPILE_STATUS) ? s : (console.error(g.getShaderInfoLog(s)), null); };
     const v = mk(g.VERTEX_SHADER, 'attribute vec2 a;varying vec2 vUv;void main(){vUv=a*.5+.5;gl_Position=vec4(a,0.,1.);}'), fr = mk(g.FRAGMENT_SHADER, FS);
     if (v && fr) { prog = g.createProgram(); g.attachShader(prog, v); g.attachShader(prog, fr); g.linkProgram(prog);
       if (g.getProgramParameter(prog, g.LINK_STATUS)) { g.useProgram(prog); const b = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, b); g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), g.STATIC_DRAW);
-        const loc = g.getAttribLocation(prog, 'a'); g.enableVertexAttribArray(loc); g.vertexAttribPointer(loc, 2, g.FLOAT, false, 0, 0); ['uR','uT','uM'].forEach(k => U[k] = g.getUniformLocation(prog, k)); } else prog = null; } }
+        const loc = g.getAttribLocation(prog, 'a'); g.enableVertexAttribArray(loc); g.vertexAttribPointer(loc, 2, g.FLOAT, false, 0, 0); ['uR','uT','uM','uX','uD'].forEach(k => U[k] = g.getUniformLocation(prog, k)); } else prog = null; } }
   if (!prog) box.classList.add('spirit-fallback');
   const size = () => { const d = Math.min(devicePixelRatio||1, 2)*scale; W = Math.max(2, cv.clientWidth*d|0); H = Math.max(2, cv.clientHeight*d|0); cv.width = W; cv.height = H; };
   size(); addEventListener('resize', size, {passive:true});
@@ -973,7 +1006,7 @@ void main(){
     if (playing) st += dt/1000;
     fr++; avg = lerp(avg, dt, .05); if (fr > 90 && avg > 28 && scale > .35) { scale -= .08; size(); fr = 0; }
     smx = lerp(smx, mx/innerWidth - .5, .04); smy = lerp(smy, .5 - my/innerHeight, .04);
-    g.viewport(0, 0, W, H); g.uniform2f(U.uR, W, H); g.uniform1f(U.uT, st); g.uniform2f(U.uM, smx, smy); g.drawArrays(g.TRIANGLES, 0, 3);
+    g.viewport(0, 0, W, H); g.uniform2f(U.uR, W, H); g.uniform1f(U.uT, st); g.uniform2f(U.uM, smx, smy); const mob = innerWidth < 860; g.uniform1f(U.uX, mob ? 0 : 1.35); g.uniform1f(U.uD, mob ? 12.5 : 8.4); g.drawArrays(g.TRIANGLES, 0, 3);
   });
   // ---- optional real clip ----
   const probe = document.createElement('video'); probe.preload = 'metadata'; probe.muted = true;

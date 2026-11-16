@@ -499,5 +499,6 @@ body,p,.sc-txt p,.pitem .body p,.road p,.cap p,.tile .cap2,.fact strong,.legend2
 /* spirits background */
 .spirit-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
 .spirit-fallback{background:radial-gradient(60% 70% at 70% 35%,#F2B256 0%,#9C5414 45%,#2A1204 100%)!important}
-.bgfilm-tint{background:linear-gradient(180deg,rgba(27,19,13,0) 0%,rgba(27,19,13,.05) 45%,rgba(27,19,13,.78) 100%)!important}
+.bgfilm-tint{background:linear-gradient(90deg,rgba(15,8,4,.55) 0%,rgba(15,8,4,.15) 45%,rgba(15,8,4,0) 70%),linear-gradient(180deg,rgba(15,8,4,0) 55%,rgba(15,8,4,.6) 100%)!important}
+@media (max-width:860px){.bgfilm-tint{background:linear-gradient(180deg,rgba(15,8,4,0) 35%,rgba(15,8,4,.82) 75%)!important}}
 .bgfilm-tint::after{display:none}

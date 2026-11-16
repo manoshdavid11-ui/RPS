@@ -914,8 +914,8 @@ extraDraw.push(() => { let on = -1; railS.forEach((s,i) => { if (!s) return; con
 
 
 /* ================= REAL MEDIA SLOTS ================= */
-// EDIT HERE: put a YouTube video ID, or set youtube to '' to use assets/video/showreel.mp4 instead.
-const SHOWREEL = { youtube: 'plR2EIlaCZo', vertical: true, file: 'assets/video/showreel.mp4' };
+// To use your own background clip, save it as assets/video/showreel.mp4.
+const SHOWREEL = { file: 'assets/video/showreel.mp4' };
 // Process films: if assets/video/0X-*.mp4 exists, it replaces the animation.
 $$('.film-vid').forEach(v => {
   const film = v.parentElement, cv = film.querySelector('canvas');
@@ -925,26 +925,64 @@ $$('.film-vid').forEach(v => {
   new IntersectionObserver((es, o) => es.forEach(e => { if (e.isIntersecting) { load(); o.disconnect(); } }), {rootMargin:'600px'}).observe(film);
   new IntersectionObserver(es => es.forEach(e => { if (!film.classList.contains('has-video') || RM) return; e.isIntersecting ? v.play().catch(() => {}) : v.pause(); })).observe(film);
 });
-// Background film: a YouTube video (SHOWREEL.youtube) or your own file (assets/video/showreel.mp4).
+// Background film: a live "spirits" scene (amber liquid, light and beads). If you add
+// assets/video/showreel.mp4, your own clip plays instead.
 (() => { const box = $('#reelBox'), sec = $('#film'), bP = $('#filmPause'), bS = $('#filmSound'); if (!box) return;
-  let playing = !RM, muted = true, yt = null, vid = null;
+  let playing = !RM, vid = null;
   const label = (b, t) => b.querySelectorAll('.lbl span').forEach(x => x.textContent = t);
-  const cmd = f => { if (yt && yt.contentWindow) yt.contentWindow.postMessage(JSON.stringify({event:'command', func:f, args:[]}), '*'); };
-  if (SHOWREEL.youtube) {
-    const id = SHOWREEL.youtube;
-    box.style.backgroundImage = `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)`;
-    const mount = () => { if (yt) return; yt = document.createElement('iframe');
-      yt.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=${RM?0:1}&mute=1&loop=1&playlist=${id}&controls=0&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3&enablejsapi=1`;
-      yt.title = 'Background video'; yt.tabIndex = -1; yt.allow = 'autoplay; encrypted-media'; yt.className = SHOWREEL.vertical ? 'tall' : ''; box.appendChild(yt); };
-    new IntersectionObserver((es,o) => es.forEach(e => { if (e.isIntersecting) { mount(); o.disconnect(); } }), {rootMargin:'400px'}).observe(sec);
-  } else {
-    vid = document.createElement('video'); vid.muted = true; vid.loop = true; vid.playsInline = true; vid.autoplay = !RM; vid.preload = 'metadata';
-    vid.addEventListener('error', () => { sec.hidden = true; }); vid.src = SHOWREEL.file; box.appendChild(vid);
-  }
-  if (RM) label(bP, 'Play video');
-  bP.addEventListener('click', () => { playing = !playing; if (vid) playing ? vid.play() : vid.pause(); cmd(playing ? 'playVideo' : 'pauseVideo'); bP.setAttribute('aria-pressed', !playing); label(bP, playing ? 'Pause video' : 'Play video'); });
-  bS.addEventListener('click', () => { muted = !muted; if (vid) vid.muted = muted; cmd(muted ? 'mute' : 'unMute'); bS.setAttribute('aria-pressed', !muted); label(bS, muted ? 'Turn sound on' : 'Turn sound off'); });
-  new IntersectionObserver(es => es.forEach(e => { if (!playing) return; if (vid) e.isIntersecting ? vid.play().catch(()=>{}) : vid.pause(); cmd(e.isIntersecting ? 'playVideo' : 'pauseVideo'); })).observe(sec);
+  bS.hidden = true;
+  // ---- WebGL spirits shader ----
+  const cv = document.createElement('canvas'); cv.className = 'spirit-cv'; box.appendChild(cv);
+  const g = cv.getContext('webgl', {antialias:false, alpha:false});
+  const FS = `precision highp float;uniform vec2 uR;uniform float uT;uniform vec2 uM;varying vec2 vUv;
+float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+1.),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}
+float caus(vec2 p,float t){vec2 q=p;float c=1.;float inten=.005;for(int n=0;n<5;n++){float tt=t*(1.-(3.5/float(n+1)));q=p+vec2(cos(tt-q.x)+sin(tt+q.y),sin(tt-q.y)+cos(tt+q.x));c+=1./length(vec2(p.x/(sin(q.x+tt)/inten),p.y/(cos(q.y+tt)/inten)));}c/=5.;c=1.17-pow(c,1.4);return clamp(pow(clamp(c,0.,1.),8.),0.,1.);}
+void main(){
+ vec2 fc=vUv*uR;vec2 uv=fc/uR.y;vec2 p=(fc-.5*uR)/uR.y;float t=uT;
+ vec2 w=vec2(fbm(uv*1.6+vec2(0.,-t*.05)),fbm(uv*1.6+vec2(5.2,1.3)-t*.04));
+ float f=fbm(uv*2.2+w*1.6+vec2(t*.02,-t*.06));
+ vec3 deep=vec3(.16,.06,.015),mid=vec3(.62,.30,.06),hi=vec3(.98,.70,.30);
+ vec2 L=vec2(.55+uM.x*.15,.42+uM.y*.1);
+ float light=smoothstep(1.25,.0,length(p-L*vec2(1.,1.)+vec2(.2,.0)));
+ vec3 col=mix(deep,mid,smoothstep(.15,.85,f));col=mix(col,hi,pow(light,1.6)*smoothstep(.3,.9,f+light*.3));
+ float c=caus(p*4.+w*.6,t*.35);col+=vec3(1.,.78,.42)*c*(.18+.5*light);
+ float s=smoothstep(.06,0.,abs(p.x+.62+.04*sin(p.y*3.+t*.3)))*(.35+.3*sin(p.y*2.+t*.2));col+=vec3(1.,.9,.7)*s*.35;
+ for(int i=0;i<3;i++){float fi=float(i);vec2 gp=uv*vec2(14.+fi*6.,7.+fi*3.)+vec2(fi*3.1,t*(.35+fi*.2));vec2 id=floor(gp);vec2 gf=fract(gp)-.5;float r=h21(id+fi*7.);
+  if(r>.82){vec2 o=vec2(h21(id+3.)-.5,h21(id+9.)-.5)*.5;float d=length(gf-o);float rad=.06+.08*h21(id+5.);
+   float ring=smoothstep(rad,rad*.6,d)-smoothstep(rad*.75,rad*.3,d)*.6;col+=vec3(1.,.86,.6)*ring*(.25+.25*light);
+   col+=vec3(1.)*smoothstep(rad*.35,0.,length(gf-o-vec2(-rad*.3,rad*.3)))*.35;}}
+ for(int i=0;i<6;i++){float fi=float(i);vec2 bc=vec2(fract(.17*fi+.05*sin(t*.07+fi))*1.9-.95,fract(.31*fi+t*.012*(1.+fi*.2))*1.2-.6);float d=length(p-bc*vec2(uR.x/uR.y*.55,1.));float br=.08+.05*fract(fi*.37);
+  col+=vec3(1.,.8,.5)*smoothstep(br,br*.75,d)*.07;}
+ col*=1.-.55*dot(vUv-.5,vUv-.5)*2.;
+ col+=(h21(fc+fract(t)*61.)-.5)*.02;
+ gl_FragColor=vec4(pow(clamp(col,0.,1.),vec3(.95)),1.);}`;
+  let prog = null, U = {}, scale = .6, W = 2, H = 2;
+  if (g) { const mk = (ty, src) => { const s = g.createShader(ty); g.shaderSource(s, src); g.compileShader(s); return g.getShaderParameter(s, g.COMPILE_STATUS) ? s : (console.error(g.getShaderInfoLog(s)), null); };
+    const v = mk(g.VERTEX_SHADER, 'attribute vec2 a;varying vec2 vUv;void main(){vUv=a*.5+.5;gl_Position=vec4(a,0.,1.);}'), fr = mk(g.FRAGMENT_SHADER, FS);
+    if (v && fr) { prog = g.createProgram(); g.attachShader(prog, v); g.attachShader(prog, fr); g.linkProgram(prog);
+      if (g.getProgramParameter(prog, g.LINK_STATUS)) { g.useProgram(prog); const b = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, b); g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), g.STATIC_DRAW);
+        const loc = g.getAttribLocation(prog, 'a'); g.enableVertexAttribArray(loc); g.vertexAttribPointer(loc, 2, g.FLOAT, false, 0, 0); ['uR','uT','uM'].forEach(k => U[k] = g.getUniformLocation(prog, k)); } else prog = null; } }
+  if (!prog) box.classList.add('spirit-fallback');
+  const size = () => { const d = Math.min(devicePixelRatio||1, 2)*scale; W = Math.max(2, cv.clientWidth*d|0); H = Math.max(2, cv.clientHeight*d|0); cv.width = W; cv.height = H; };
+  size(); addEventListener('resize', size, {passive:true});
+  let st = RM ? 30 : 0, last = 0, smx = 0, smy = 0, avg = 16, fr = 0;
+  extraDraw.push((t, dt) => {
+    if (!prog || vid || !vis(sec)) return;
+    if (playing) st += dt/1000;
+    fr++; avg = lerp(avg, dt, .05); if (fr > 90 && avg > 28 && scale > .35) { scale -= .08; size(); fr = 0; }
+    smx = lerp(smx, mx/innerWidth - .5, .04); smy = lerp(smy, .5 - my/innerHeight, .04);
+    g.viewport(0, 0, W, H); g.uniform2f(U.uR, W, H); g.uniform1f(U.uT, st); g.uniform2f(U.uM, smx, smy); g.drawArrays(g.TRIANGLES, 0, 3);
+  });
+  // ---- optional real clip ----
+  const probe = document.createElement('video'); probe.preload = 'metadata'; probe.muted = true;
+  probe.addEventListener('loadedmetadata', () => { vid = document.createElement('video'); vid.muted = true; vid.loop = true; vid.playsInline = true; vid.autoplay = !RM; vid.src = SHOWREEL.file; box.appendChild(vid); cv.remove(); bS.hidden = false; });
+  probe.src = SHOWREEL.file;
+  if (RM) label(bP, 'Play animation');
+  bP.addEventListener('click', () => { playing = !playing; if (vid) playing ? vid.play() : vid.pause(); bP.setAttribute('aria-pressed', !playing); label(bP, playing ? (vid ? 'Pause video' : 'Pause animation') : (vid ? 'Play video' : 'Play animation')); });
+  bS.addEventListener('click', () => { if (!vid) return; vid.muted = !vid.muted; bS.setAttribute('aria-pressed', !vid.muted); label(bS, vid.muted ? 'Turn sound on' : 'Turn sound off'); });
+  new IntersectionObserver(es => es.forEach(e => { if (vid && playing) e.isIntersecting ? vid.play().catch(()=>{}) : vid.pause(); })).observe(sec);
 })();
 
 /* ---------- main loop ---------- */

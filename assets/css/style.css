@@ -495,3 +495,9 @@ body,p,.sc-txt p,.pitem .body p,.road p,.cap p,.tile .cap2,.fact strong,.legend2
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;transition-delay:0s!important}
   #hero{height:100vh}
 }
+
+/* spirits background */
+.spirit-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+.spirit-fallback{background:radial-gradient(60% 70% at 70% 35%,#F2B256 0%,#9C5414 45%,#2A1204 100%)!important}
+.bgfilm-tint{background:linear-gradient(180deg,rgba(27,19,13,0) 0%,rgba(27,19,13,.05) 45%,rgba(27,19,13,.78) 100%)!important}
+.bgfilm-tint::after{display:none}

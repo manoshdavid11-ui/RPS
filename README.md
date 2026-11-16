@@ -34,20 +34,11 @@ assets/images/brands/    your bottle photos go here
 assets/images/favicon.svg
 ```
 
-## The background video
+## The "Every drop, distilled in-house" background
 
-The full-screen "From the field, for real" section plays a YouTube video behind the text. It plays muted and on a loop, with an amber-and-blue tint, and visitors get "Pause video" and "Turn sound on" buttons.
+This section shows a live amber-spirit animation: slowly swirling liquid, rippling light and rising beads. Visitors get a "Pause animation" button.
 
-To change it, open `assets/js/main.js`, search for `SHOWREEL`, and edit:
-
-```js
-const SHOWREEL = { youtube: 'plR2EIlaCZo', vertical: true, file: 'assets/video/showreel.mp4' };
-```
-
-- **A different YouTube video:** replace the ID. It's the part after `/shorts/` or `watch?v=`. Set `vertical: false` for a normal widescreen video.
-- **Your own file instead of YouTube:** set `youtube: ''` and save the clip as `assets/video/showreel.mp4`.
-
-Only use videos the company owns or has permission to use. YouTube also lets uploaders block embedding, in which case the section shows the video's thumbnail.
+To use your own clip instead, save it as `assets/video/showreel.mp4` (MP4, H.264, 1920x1080, 10 to 20 seconds, under 15 MB). It replaces the animation automatically and adds a sound button. Use footage of the product, the plants or the process only, never people drinking.
 
 ## Real footage for the five "From field to fuel" scenes
 
